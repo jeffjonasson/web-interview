@@ -9,26 +9,19 @@ import {
   Typography,
 } from '@mui/material'
 import ReceiptIcon from '@mui/icons-material/Receipt'
+import CheckIcon from '@mui/icons-material/Check'
 import { TodoListForm } from './TodoListForm'
 
-// Simulate network
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
-
 const fetchTodoLists = () => {
-  return sleep(1000).then(() =>
-    Promise.resolve({
-      '0000000001': {
-        id: '0000000001',
-        title: 'First List',
-        todos: ['First todo of first list!'],
-      },
-      '0000000002': {
-        id: '0000000002',
-        title: 'Second List',
-        todos: ['First todo of second list!'],
-      },
+  return fetch('http://localhost:3001/todos')
+    .then((response) => response.json())
+    .then((data) => {
+      return data
     })
-  )
+    .catch((error) => {
+      console.error('Error fetching todo lists:', error)
+      return {}
+    })
 }
 
 export const TodoLists = ({ style }) => {
@@ -39,6 +32,24 @@ export const TodoLists = ({ style }) => {
     fetchTodoLists().then(setTodoLists)
   }, [])
 
+  const updateTodoListHandler = async (id, todos) => {
+    try {
+      const response = await fetch('http://localhost:3001/update-todo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, todos }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setTodoLists(data)
+      }
+    } catch (error) {
+      console.error('Error updating todo:', error)
+    }
+  }
+
   if (!Object.keys(todoLists).length) return null
   return (
     <Fragment>
@@ -46,14 +57,18 @@ export const TodoLists = ({ style }) => {
         <CardContent>
           <Typography component='h2'>My Todo Lists</Typography>
           <List>
-            {Object.keys(todoLists).map((key) => (
-              <ListItemButton key={key} onClick={() => setActiveList(key)}>
-                <ListItemIcon>
-                  <ReceiptIcon />
-                </ListItemIcon>
-                <ListItemText primary={todoLists[key].title} />
-              </ListItemButton>
-            ))}
+            {Object.keys(todoLists).map((key) => {
+              const isCompletedTodos = todoLists[key].todos.every((todo) => todo.completed)
+              return (
+                <ListItemButton key={key} onClick={() => setActiveList(key)}>
+                  <ListItemIcon>{isCompletedTodos && <CheckIcon />}</ListItemIcon>
+                  <ListItemIcon>
+                    <ReceiptIcon />
+                  </ListItemIcon>
+                  <ListItemText primary={todoLists[key].title} />
+                </ListItemButton>
+              )
+            })}
           </List>
         </CardContent>
       </Card>
@@ -61,13 +76,7 @@ export const TodoLists = ({ style }) => {
         <TodoListForm
           key={activeList} // use key to make React recreate component to reset internal state
           todoList={todoLists[activeList]}
-          saveTodoList={(id, { todos }) => {
-            const listToUpdate = todoLists[id]
-            setTodoLists({
-              ...todoLists,
-              [id]: { ...listToUpdate, todos },
-            })
-          }}
+          saveTodoList={(todos) => updateTodoListHandler(activeList, todos)}
         />
       )}
     </Fragment>
